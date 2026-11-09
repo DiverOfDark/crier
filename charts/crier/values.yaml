@@ -1,0 +1,49 @@
+image:
+  # The chart is meant to run with GitImage: the pod annotation below makes
+  # its webhook replace this with the digest built from the repo.
+  repository: crier
+  tag: latest
+  pullPolicy: IfNotPresent
+
+podAnnotations: {}
+
+persistence:
+  enabled: true
+  size: 256Mi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+
+config:
+  pollIntervalSeconds: 600
+  hnTop: 10
+  lobstersTop: 10
+  initialPosts: 3
+  maxPostsPerCycle: 10
+  postLanguage: English
+  openaiUrl: https://api.openai.com/v1/chat/completions
+  openaiModel: gpt-5-mini
+  openaiReasoningEffort: low
+  logLevel: info
+
+# Secret with OPENAI_API_KEY, TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.
+# Leave existingSecret empty to have the chart create one from the values.
+secrets:
+  existingSecret: ""
+  openaiApiKey: ""
+  telegramBotToken: ""
+  telegramChatId: ""
+
+# Extra manifests rendered with the release (ExternalSecret, GitImage, ...).
+# Entries go through Helm's tpl.
+additionalObjects: []
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 256Mi
+nodeSelector: {}
+tolerations: []
+affinity: {}

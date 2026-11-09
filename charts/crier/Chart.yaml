@@ -1,0 +1,6 @@
+apiVersion: v2
+name: crier
+description: Posts LLM-written summaries of new Hacker News and Lobsters top stories to Telegram
+version: 0.1.0
+appVersion: "0.1.0"
+type: application

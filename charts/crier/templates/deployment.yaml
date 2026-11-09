@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "crier.fullname" . }}
+spec:
+  replicas: 1
+  # One writer for the SQLite file on a ReadWriteOnce volume.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "crier.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "crier.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: crier
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["run"]
+          env:
+            - { name: CRIER_DATABASE_URL, value: "sqlite:///data/crier.sqlite" }
+            - { name: CRIER_LOG_JSON, value: "true" }
+            - { name: RUST_LOG, value: {{ .Values.config.logLevel | quote }} }
+            - { name: CRIER_POLL_INTERVAL_SECONDS, value: {{ .Values.config.pollIntervalSeconds | quote }} }
+            - { name: CRIER_HN_TOP, value: {{ .Values.config.hnTop | quote }} }
+            - { name: CRIER_LOBSTERS_TOP, value: {{ .Values.config.lobstersTop | quote }} }
+            - { name: CRIER_INITIAL_POSTS, value: {{ .Values.config.initialPosts | quote }} }
+            - { name: CRIER_MAX_POSTS_PER_CYCLE, value: {{ .Values.config.maxPostsPerCycle | quote }} }
+            - { name: CRIER_POST_LANGUAGE, value: {{ .Values.config.postLanguage | quote }} }
+            - { name: CRIER_OPENAI_URL, value: {{ .Values.config.openaiUrl | quote }} }
+            - { name: CRIER_OPENAI_MODEL, value: {{ .Values.config.openaiModel | quote }} }
+            {{- with .Values.config.openaiReasoningEffort }}
+            - { name: CRIER_OPENAI_REASONING_EFFORT, value: {{ . | quote }} }
+            {{- end }}
+            {{- range list "OPENAI_API_KEY" "TELEGRAM_BOT_TOKEN" "TELEGRAM_CHAT_ID" }}
+            - name: {{ . }}
+              valueFrom: { secretKeyRef: { name: {{ include "crier.secretName" $ }}, key: {{ . }} } }
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "crier.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
